@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>대구 태양광 탐지 결과</title>
+<link rel="stylesheet" href="portal/portal.css">
+</head>
+<body>
+<header class="top">
+  <div class="wrap top-in">
+    <a class="logo" href="./">태양광 탐지 결과</a>
+    <nav class="nav">
+      <a href="#summary">요약</a><a href="#runs">결과 비교</a><a href="#method">방법</a><a href="#eval">평가</a>
+      <a href="#images">검증 사례</a><a href="#gallery">탐지 갤러리</a><a href="#region">지역별</a><a href="#limits">한계·자료</a>
+    </nav>
+    <a class="btn primary" href="atlas/">지도 아틀라스 ↗</a>
+  </div>
+</header>
+
+<main class="wrap">
+  <section class="hero" id="summary">
+    <p class="eyebrow">NGII 정사영상 2025 (25 cm) × 딥러닝 분할 모델</p>
+    <h1>대구 일대 태양광 발전설비 탐지</h1>
+    <p class="lead">국토지리정보원 정사영상 <b id="hSheets">–</b>도엽(약 <b id="hKm2">–</b> km², 대구 1:50,000 도엽 35803)에
+      태양광 패널 분할 모델을 적용해 새로 찾은 결과입니다. 기존 공개 자료(Global Renewables Watch 2024Q2)는 이 영역에서
+      <b id="hGrw">–</b>곳만 담고 있습니다.</p>
+    <div class="kpis" id="kpis"></div>
+    <div class="hero-actions">
+      <a class="btn primary" href="atlas/">지도에서 탐지 결과 보기</a>
+      <a class="btn" href="viewer/">정사영상 원본 뷰어</a>
+      <a class="btn" href="#gallery">탐지 사진 둘러보기</a>
+    </div>
+  </section>
+
+  <section id="runs">
+    <h2>결과 비교 — 모델 단계별</h2>
+    <p class="muted">같은 영상에 세 단계의 모델을 적용했습니다. 지도 아틀라스에서 각 결과를 골라 볼 수 있습니다.</p>
+    <div class="table-wrap"><table class="tbl" id="runTable">
+      <thead><tr><th>결과</th><th>신뢰도 하한</th><th>탐지</th><th>GRW에 없던 신규</th><th>패널 면적 (m²)</th><th>추정 용량 (MWp)</th><th></th></tr></thead>
+      <tbody></tbody></table></div>
+    <p class="note">1차의 223 MWp는 비닐하우스 오탐과 넓게 잡힌 경계가 포함된 값입니다. 최종(3차) 124 MWp는 판정 표본 기준 정밀도가 높지만, 놓친 설비가 있어 <b>하한에 가까운 추정</b>입니다.</p>
+  </section>
+
+  <section id="method">
+    <h2>방법</h2>
+    <ol class="steps">
+      <li><b>정사영상 수집·정합</b> — NGII 2025년 정사영상 100도엽(31.3 GB, 25 cm)을 내려받아 위치를 부여하고(EPSG:5186) 하나의 모자이크로 묶었습니다. 이웃 도엽 180쌍 모두 어긋남 0.</li>
+      <li><b>기존 방법 시험</b> — GRW 공개 모델(4.7 m 위성용)과 범용 텍스트 탐지(GroundingDINO+SAM)는 대구의 지붕형·중소형 설비를 거의 잡지 못해 쓰지 않았습니다. GRW 자료는 참고 레이어로만 씁니다.</li>
+      <li><b>모델 학습 (1차)</b> — 공개 PV 데이터셋 <span id="dsInfo"></span>으로 U-Net(ResNet-34)을 0.3 m 해상도에서 학습. 데이터셋 내 검증 IoU <b id="baseIou">–</b>.</li>
+      <li><b>전체 추론</b> — 모자이크를 0.3 m로 줄여 1024 px 창(가장자리 96 px 겹침)으로 추론하고, 연결 영역을 폴리곤으로 만들어 창 경계 조각을 합쳤습니다. 면적 10 m² 미만은 제외.</li>
+      <li><b>직접 검토</b> — 1차 결과 무작위 96곳 중 판정 가능한 86곳을 사람이 판정: 맞음 68, 오탐 18 (주로 비닐하우스). 이를 학습용 43곳 / 평가용 43곳으로 나눴습니다.</li>
+      <li><b>추가 학습 (2·3차)</b> — 오탐 위치를 '태양광 없음'으로(2차), 여기에 대구 지붕형 맞음 위치를 '태양광'으로 더해(3차) 낮은 학습률로 추가 학습. 원래 데이터셋 성능(IoU 0.92)은 유지.</li>
+      <li><b>집계</b> — GRW 2024Q2 폴리곤과 겹치지 않으면 '신규'. 용량 = 패널 면적 × 0.18 kWp/m² (모듈 효율 약 18% 가정).</li>
+    </ol>
+  </section>
+
+  <section id="eval">
+    <h2>평가 — 학습에 쓰지 않은 판정 표본</h2>
+    <p class="muted">평가용 표본: 오탐 <b id="eFp">–</b>곳, 맞음 <b id="eOk">–</b>곳. 각 결과가 오탐을 얼마나 다시 잡는지, 맞음을 얼마나 유지하는지 비교합니다. 굵은 행은 지도·요약에 쓴 설정입니다.</p>
+    <div class="table-wrap"><table class="tbl" id="evalTable">
+      <thead><tr><th>결과</th><th>신뢰도 하한</th><th>탐지</th><th>오탐 남음</th><th>맞음 유지</th><th>정밀도</th><th>추정 MWp</th></tr></thead>
+      <tbody></tbody></table></div>
+    <p class="note">표본이 작아(각 9·34곳) 수치의 오차가 큽니다. '맞음'도 모델이 찾은 것 중에서 골랐으므로 <b>재현율(놓친 비율)은 측정되지 않았습니다.</b></p>
+
+    <div class="chart-card">
+      <div class="chart-head"><h3>1차 학습 곡선 — 데이터셋 검증 IoU</h3><span class="muted" id="curveNote"></span></div>
+      <div class="chart" id="curve"></div>
+      <details class="tv"><summary>표로 보기</summary><table class="tbl small" id="curveTable"><thead><tr><th>에폭</th><th>손실</th><th>검증 IoU</th></tr></thead><tbody></tbody></table></details>
+    </div>
+  </section>
+
+  <section id="images">
+    <h2>검증 사례</h2>
+    <p class="muted">초록: 탐지 경계 · 파랑: GRW 2024Q2 폴리곤. 그림을 누르면 크게 봅니다.</p>
+    <div class="figs" id="figs"></div>
+  </section>
+
+  <section id="gallery">
+    <h2>탐지 갤러리 <span class="muted small" id="galRun"></span></h2>
+    <div class="filters">
+      <label>시군구 <select id="gAdm"><option value="">전체</option></select></label>
+      <label>규모 <select id="gSize"><option value="">전체</option></select></label>
+      <label>정렬 <select id="gSort"><option value="area">면적 큰 순</option><option value="prob">신뢰도 높은 순</option><option value="probAsc">신뢰도 낮은 순</option></select></label>
+      <span class="muted" id="gCount"></span>
+    </div>
+    <div class="grid" id="grid"></div>
+    <div class="pager"><button type="button" id="gMore">더 보기</button></div>
+  </section>
+
+  <section id="region">
+    <h2>시군구별 — 최종 결과</h2>
+    <div class="table-wrap"><table class="tbl" id="admTable">
+      <thead><tr><th>시군구</th><th>탐지</th><th>패널 면적 (m²)</th><th>추정 용량 (MWp)</th><th class="barcol"></th></tr></thead>
+      <tbody></tbody></table></div>
+    <p class="note">시군구 집계는 정사영상 영역(35803 도엽) 안의 탐지만 포함합니다. 경계에 걸친 시군구는 일부만 들어 있습니다.</p>
+  </section>
+
+  <section id="limits">
+    <h2>한계</h2>
+    <ul class="bullets">
+      <li><b>재현율 미측정</b> — 하수처리장 처리조 위처럼 형태가 특이한 설비는 최종 모델이 대부분 놓칩니다. 용량은 하한에 가까운 추정입니다.</li>
+      <li><b>작은 판정 표본</b> — 직접 판정은 86곳(오탐 18, 맞음 68)뿐입니다. 아틀라스의 맞음/오탐 검토 기능으로 표본을 늘릴 수 있습니다.</li>
+      <li><b>보안 흐림 구역</b> — 저수지 등 흐림 처리된 곳은 수상 태양광을 확인할 수 없습니다.</li>
+      <li><b>용량 추정</b> — 패널 면적에 효율을 가정한 값으로, 허가·설비 용량과 다를 수 있습니다.</li>
+      <li><b>학습 데이터</b> — 기본 학습은 중국 항공·드론 영상입니다. 대구 영상 정답은 판정한 43곳뿐입니다.</li>
+    </ul>
+
+    <h2>자료와 내려받기</h2>
+    <div class="cols">
+      <div>
+        <h3>출처</h3>
+        <ul class="bullets small">
+          <li>정사영상: 국토지리정보원(NGII) 2025 정사영상 25 cm</li>
+          <li>학습 데이터: <a href="https://doi.org/10.5281/zenodo.5171712" target="_blank" rel="noopener">Jiang et al. 2021, Multi-resolution PV dataset</a> (CC BY 4.0)</li>
+          <li>참고: <a href="https://www.globalrenewableswatch.org/" target="_blank" rel="noopener">Global Renewables Watch</a> 2024Q2 (Microsoft·Planet·TNC, MIT)</li>
+          <li>행정경계: geoBoundaries (CC BY 4.0)</li>
+        </ul>
+      </div>
+      <div>
+        <h3>내려받기 (GeoJSON, WGS84)</h3>
+        <ul class="bullets small" id="downloads"></ul>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="foot"><div class="wrap muted small" id="foot"></div></footer>
+
+<div class="lightbox" id="lightbox" hidden><img alt=""><p></p></div>
+<div class="tip" id="tip" hidden></div>
+<script src="portal/portal.js"></script>
+</body>
+</html>

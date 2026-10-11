@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>정사영상 뷰어</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+  :root { --panel-bg: #ffffff; --panel-fg: #1d2330; --muted: #5b6475; --accent: #0f6e56; --border: #d7dce4; }
+  @media (prefers-color-scheme: dark) {
+    :root { --panel-bg: #1c2129; --panel-fg: #e6e9ef; --muted: #9aa3b2; --accent: #4cc39b; --border: #343b47; }
+  }
+  html, body { margin: 0; height: 100%; background: #111; font-family: system-ui, "Malgun Gothic", sans-serif; }
+  #map { position: absolute; inset: 0; }
+  .panel {
+    position: absolute; top: 12px; left: 12px; z-index: 1000; max-width: min(320px, calc(100vw - 24px));
+    background: var(--panel-bg); color: var(--panel-fg); border: 1px solid var(--border);
+    border-radius: 8px; padding: 12px 14px; box-shadow: 0 2px 10px rgba(0,0,0,.25); font-size: 13px; line-height: 1.5;
+  }
+  .panel h1 { font-size: 15px; margin: 0 0 4px; }
+  .panel .sub { color: var(--muted); margin-bottom: 8px; }
+  .panel label { display: flex; align-items: center; gap: 6px; margin: 4px 0; cursor: pointer; }
+  .panel input[type=range] { width: 100%; accent-color: var(--accent); }
+  .panel .row { margin-top: 8px; }
+  #coord { font-variant-numeric: tabular-nums; color: var(--muted); margin-top: 8px; }
+  .sheet-label { color: #fff; font: 600 11px system-ui, sans-serif; text-shadow: 0 0 3px #000, 0 0 3px #000; white-space: nowrap; }
+</style>
+</head>
+<body>
+<div id="map"></div>
+<div class="panel">
+  <h1><a href="../" style="color:inherit;text-decoration:none" title="결과 포털로">◀</a> 정사영상 뷰어</h1>
+  <div class="sub" id="summary">불러오는 중…</div>
+  <label><input type="checkbox" id="chkOrtho" checked> 정사영상 (NGII 25cm)</label>
+  <label><input type="checkbox" id="chkSheets"> 도엽 경계·번호</label>
+  <div class="row">정사영상 투명도
+    <input type="range" id="opacity" min="0" max="100" value="100">
+  </div>
+  <div id="coord">지도 위에 마우스를 올리면 좌표 표시</div>
+</div>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+(async function () {
+  const info = await fetch('../tiles/tiles.json').then(r => r.json());
+  const [w, s, e, n] = info.bounds;
+
+  const map = L.map('map', { zoomControl: true, minZoom: 6, maxZoom: 21 });
+  // 주소 #줌/위도/경도 로 위치 공유·복원
+  const h = location.hash.slice(1).split('/').map(Number);
+  if (h.length === 3 && h.every(Number.isFinite)) map.setView([h[1], h[2]], h[0]);
+  else map.fitBounds([[s, w], [n, e]]);
+  map.on('moveend', () => {
+    const c = map.getCenter();
+    history.replaceState(null, '', `#${map.getZoom()}/${c.lat.toFixed(5)}/${c.lng.toFixed(5)}`);
+  });
+
+  const osm = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 21, maxNativeZoom: 19,
+    attribution: '&copy; OpenStreetMap contributors'
+  }).addTo(map);
+
+  const ortho = L.tileLayer('../tiles/{z}/{x}/{y}.webp', {
+    minZoom: 6, maxZoom: 21, minNativeZoom: info.minzoom, maxNativeZoom: info.maxzoom,
+    bounds: [[s, w], [n, e]], keepBuffer: 4,
+    attribution: '정사영상 &copy; 국토지리정보원'
+  }).addTo(map);
+
+  // 도엽 경계: 8자리 1:5000 도엽번호 → 경위도 1'30" 격자
+  function sheetBounds(no) {
+    const lat0 = +no.slice(0, 2), lon0 = 120 + +no[2];
+    const k = +no.slice(3, 5) - 1, r = Math.floor(k / 4), c = k % 4;
+    const m = +no.slice(5, 8) - 1, r2 = Math.floor(m / 10), c2 = m % 10;
+    const top = lat0 + 1 - r * 0.25 - r2 * 0.025, left = lon0 + c * 0.25 + c2 * 0.025;
+    return [[top - 0.025, left], [top, left + 0.025]];
+  }
+  const sheets = L.layerGroup(info.sheets.map(no => {
+    const b = sheetBounds(no);
+    const rect = L.rectangle(b, { color: '#ffd23f', weight: 1, fill: false });
+    const center = [(b[0][0] + b[1][0]) / 2, (b[0][1] + b[1][1]) / 2];
+    const label = L.marker(center, { interactive: false,
+      icon: L.divIcon({ className: 'sheet-label', html: no, iconSize: null }) });
+    return L.layerGroup([rect, label]);
+  }));
+
+  document.getElementById('summary').textContent =
+    `도엽 ${info.sheets.length}매 · 줌 ${info.minzoom}–${info.maxzoom} · 원본 좌표계 ${info.crs_source}`;
+  document.getElementById('chkOrtho').onchange = e => e.target.checked ? ortho.addTo(map) : map.removeLayer(ortho);
+  document.getElementById('chkSheets').onchange = e => e.target.checked ? sheets.addTo(map) : map.removeLayer(sheets);
+  document.getElementById('opacity').oninput = e => ortho.setOpacity(e.target.value / 100);
+  map.on('mousemove', e => {
+    document.getElementById('coord').textContent =
+      `위도 ${e.latlng.lat.toFixed(6)}, 경도 ${e.latlng.lng.toFixed(6)} · 줌 ${map.getZoom()}`;
+  });
+  L.control.scale({ imperial: false }).addTo(map);
+})();
+</script>
+</body>
+</html>

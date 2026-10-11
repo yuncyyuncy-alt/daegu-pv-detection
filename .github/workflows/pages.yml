@@ -1,0 +1,32 @@
+# 정사영상 타일은 파일 수가 많아 tiles_pack/ 에 tar 조각으로 올려 두고, 배포할 때 풀어서 GitHub Pages에 올린다.
+name: Deploy to GitHub Pages
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+concurrency:
+  group: pages
+  cancel-in-progress: true
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Unpack tiles
+        run: |
+          cat tiles_pack/tiles.tar.part-* | tar -xf -
+          rm -rf tiles_pack
+          echo "tiles: $(find tiles -type f | wc -l) files, $(du -sh tiles | cut -f1)"
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: .
+      - id: deployment
+        uses: actions/deploy-pages@v4

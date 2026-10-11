@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>태양광 탐지 아틀라스</title>
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
+<link rel="stylesheet" href="atlas.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand"><a class="home" href="../" title="결과 포털로">◀ 포털</a> 태양광 탐지 아틀라스 <span class="brand-sub">NGII 정사영상 2025 · 대구 35803</span></div>
+  <div class="controls">
+    <label class="ctl">결과
+      <select id="selRun"></select>
+    </label>
+    <label class="ctl">지역
+      <select id="selAdm2"><option value="">탐지 영역 전체</option></select>
+    </label>
+    <label class="ctl">지표
+      <select id="selMetric">
+        <option value="">없음</option>
+        <option value="n">탐지 수</option>
+        <option value="area">패널 면적 (m²)</option>
+        <option value="mwp">추정 용량 (MWp)</option>
+        <option value="new">신규 발견 수</option>
+      </select>
+    </label>
+    <label class="ctl">신뢰도 ≥ <input type="range" id="rngProb" min="30" max="95" step="5" value="40"> <span id="lblProb">0.40</span></label>
+    <label class="ctl switch"><input type="checkbox" id="chkPopover" checked> 팝오버</label>
+  </div>
+  <button class="share" id="btnShare" type="button">위치 공유</button>
+</header>
+
+<main class="layout">
+  <aside class="panel" id="panel">
+    <button class="panel-toggle" id="btnPanel" type="button" aria-label="정보 패널 접기/펴기">⟨</button>
+    <div class="panel-body">
+      <h2 id="regionName">탐지 영역 전체</h2>
+      <p class="run-tag" id="regionRun"></p>
+      <p class="muted" id="regionNote">정사영상 25cm에서 딥러닝으로 찾은 태양광 패널</p>
+
+      <div class="kpis">
+        <div class="kpi det"><span class="kpi-label">탐지된 태양광</span><span class="kpi-val" id="kN">–</span><span class="kpi-unit">곳</span></div>
+        <div class="kpi new"><span class="kpi-label">GRW에 없던 신규</span><span class="kpi-val" id="kNew">–</span><span class="kpi-unit">곳</span></div>
+        <div class="kpi det"><span class="kpi-label">패널 면적</span><span class="kpi-val" id="kArea">–</span><span class="kpi-unit">m²</span></div>
+        <div class="kpi det"><span class="kpi-label">추정 설비 용량</span><span class="kpi-val" id="kMw">–</span><span class="kpi-unit">MWp</span></div>
+      </div>
+
+      <section>
+        <h3>규모별 분포</h3>
+        <div id="sizeBars" class="bars"></div>
+      </section>
+
+      <section>
+        <h3>시군구별</h3>
+        <table class="tbl" id="admTable"><thead><tr><th>시군구</th><th>곳</th><th>MWp</th><th>신규</th></tr></thead><tbody></tbody></table>
+      </section>
+
+      <section>
+        <h3>검토</h3>
+        <p class="muted">탐지 결과를 클릭해 <b>맞음</b>/<b>오탐</b>으로 표시하세요. 표시한 결과는 이 브라우저에 저장되고, 재학습용으로 내보낼 수 있습니다.</p>
+        <div class="review-stats" id="reviewStats">맞음 0 · 오탐 0</div>
+        <button type="button" id="btnExport">검토 결과 내보내기 (GeoJSON)</button>
+      </section>
+
+      <section>
+        <h3>레이어</h3>
+        <label class="row"><input type="checkbox" data-layer="ortho" checked> NGII 정사영상 2025 (25cm)</label>
+        <label class="row"><input type="checkbox" data-layer="det-new" checked> <span class="sw new"></span> 탐지 · 신규 발견</label>
+        <label class="row"><input type="checkbox" data-layer="det-known" checked> <span class="sw known"></span> 탐지 · GRW와 일치</label>
+        <label class="row"><input type="checkbox" data-layer="grw"> <span class="sw grw"></span> 참고: GRW 2024Q2 (위성 4.7m)</label>
+        <label class="row"><input type="checkbox" data-layer="adm" checked> 시군구 경계</label>
+        <label class="row">배경
+          <select id="selBase"><option value="sat">위성 (Esri)</option><option value="osm">일반 지도 (OSM)</option></select>
+        </label>
+      </section>
+
+      <footer class="sources muted" id="sources">
+        모델: U-Net(ResNet-34), Jiang et al. 2021 PV 데이터셋(CC BY 4.0)으로 학습 ·
+        정사영상 © 국토지리정보원 · 참고 GRW © Microsoft·Planet·TNC (MIT) · 행정경계 geoBoundaries (CC BY 4.0) ·
+        용량 = 패널 면적 × 0.18 kWp/m² (추정)
+      </footer>
+    </div>
+  </aside>
+
+  <div class="mapwrap">
+    <div id="map"></div>
+    <div class="maplegend" id="mapLegend" hidden></div>
+  </div>
+</main>
+
+<script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+<script src="atlas.js"></script>
+</body>
+</html>
